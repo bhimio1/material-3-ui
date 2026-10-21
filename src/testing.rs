@@ -106,7 +106,7 @@ type Handler = Arc<dyn Fn(&Request) -> Reply + Send + Sync>;
 
 /// The server; it lives until the test process ends.
 pub struct MockServer {
-    /// "http://127.0.0.1:<port>", no trailing slash.
+    /// `http://127.0.0.1:<port>`, no trailing slash.
     pub url: String,
     pub requests: Arc<Mutex<Vec<Request>>>,
 }

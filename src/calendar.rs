@@ -50,6 +50,16 @@ pub fn mini_month(
     first: Weekday,
     marked: impl Fn(NaiveDate) -> bool,
 ) -> Option<NaiveDate> {
+    ui.vertical(|ui| month_grid(ui, month, selected, first, marked)).inner
+}
+
+fn month_grid(
+    ui: &mut Ui,
+    month: &mut NaiveDate,
+    selected: NaiveDate,
+    first: Weekday,
+    marked: impl Fn(NaiveDate) -> bool,
+) -> Option<NaiveDate> {
     let p = widgets::palette(ui);
     let shown = month.with_day(1).unwrap_or(*month);
     ui.horizontal(|ui| {

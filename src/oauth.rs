@@ -285,7 +285,7 @@ impl TokenSource {
         Ok(token)
     }
 
-    /// "Bearer <token>", for an Authorization header.
+    /// `Bearer <token>`, for an Authorization header.
     pub fn bearer(&mut self) -> Result<String> {
         Ok(format!("Bearer {}", self.access_token()?))
     }

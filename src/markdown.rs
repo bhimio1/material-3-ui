@@ -319,7 +319,8 @@ pub fn show_with(ui: &mut Ui, src: &str, size: f32, on_link: &mut dyn FnMut(Stri
     let blocks = parsed(src);
     let p = widgets::palette(ui);
     let r = Render { p: &p, size, highlight };
-    ui.scope(|ui| {
+    // Top-down whatever the caller's layout is; spacing stays inside.
+    ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 6.0;
         for b in blocks.iter() {
             r.block(ui, b, on_link);
@@ -600,6 +601,11 @@ mod tests {
                 show(ui, doc, 14.0, &mut |_| {});
                 assert_eq!(ui.spacing().item_spacing, spacing, "the caller's spacing is left alone");
                 assert_eq!(ui.style().wrap_mode, None);
+                // Blocks stack even inside a horizontal layout.
+                ui.horizontal(|ui| {
+                    let r = ui.scope(|ui| show(ui, "one\n\ntwo\n\nthree", 14.0, &mut |_| {})).response.rect;
+                    assert!(r.height() > r.width() / 20.0 && r.height() > 3.0 * 14.0, "{r:?}");
+                });
             })
             .drop_without_applying_deltas();
         }
