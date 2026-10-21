@@ -1,6 +1,6 @@
 [package]
 name = "material-3-ui"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Shared Material 3 look for the Material 3 apps: end4-pC palette, egui style, widgets, page scaffolding"
 license = "MIT"
