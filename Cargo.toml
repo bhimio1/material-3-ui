@@ -20,15 +20,34 @@ serde_json = "1"
 dirs = "6"
 anyhow = "1"
 # Optional, behind the features below.
+zbus = { version = "4", optional = true }
+ureq = { version = "2.12", features = ["native-certs"], optional = true }
+url = { version = "2", optional = true }
+sha2 = { version = "0.10", optional = true }
+base64 = { version = "0.22", optional = true }
+fastrand = { version = "2", optional = true }
+pulldown-cmark = { version = "0.13", default-features = false, optional = true }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"], optional = true }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"], optional = true }
 
 [features]
 default = []
+# Desktop notifications with action buttons, over D-Bus.
+notify = ["dep:zbus"]
+# A blocking HTTP client with error statuses as values.
+http = ["dep:ureq", "dep:url"]
+# OAuth 2.0 browser sign-in (PKCE, loopback redirect) and token refresh.
+oauth = ["http", "dep:sha2", "dep:base64", "dep:fastrand"]
+# The Markdown renderer.
+markdown = ["dep:pulldown-cmark"]
+# The mini-month calendar and its date helpers.
+calendar = ["dep:chrono"]
 # Timestamped backups for `fs::save`.
 backups = ["dep:chrono"]
 # Decoding image thumbnails for `thumbs::Thumbnails`.
 image = ["dep:image"]
+# A mock HTTP server for tests.
+testing = []
 
 [dev-dependencies]
 tempfile = "3"
