@@ -20,8 +20,10 @@ The shared look of the Material 3 apps (Settings, Files, Music, Games, Browser, 
 
 ```toml
 [dependencies]
-material-3-ui = { git = "https://github.com/bhimio1/material-3-ui", tag = "v0.1.0" }
+material-3-ui = { git = "https://github.com/bhimio1/material-3-ui", rev = "<commit>" }
 ```
+
+Pin a commit (or a release tag once there are tags) so every app builds against a known version, and bump it deliberately.
 
 ```rust
 use material_3_ui::theme::{ThemeManager, ThemeSettings};
