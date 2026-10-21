@@ -40,7 +40,7 @@ pub fn pick(configured: &str) -> Option<String> {
 /// afterwards so the output can be read.
 pub fn run(configured: &str, script: &str) -> Result<String, String> {
     let terminal = pick(configured).ok_or_else(|| {
-        "No terminal found. Set one in Preferences → Terminal.".to_string()
+        "No terminal found. Install one (kitty, foot, alacritty, …) or set $TERMINAL.".to_string()
     })?;
     let mut parts = terminal.split_whitespace();
     let program = parts.next().unwrap_or_default().to_string();

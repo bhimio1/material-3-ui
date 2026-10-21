@@ -85,16 +85,10 @@ pub fn exists(program: &str) -> bool {
 }
 
 /// Write a root-owned file through `pkexec`, keeping a `.bak` copy of the
-/// previous contents next to it. One authentication prompt.
+/// previous contents next to it. One authentication prompt. See
+/// [`crate::fs::pkexec_write`] for bytes and the backup made optional.
 pub fn pkexec_write(path: &Path, contents: &str) -> Result<(), String> {
-    let target = path.to_string_lossy();
-    let script = r#"set -e; [ -f "$1" ] && cp -a "$1" "$1.bak"; cat > "$1""#;
-    run_with_stdin(
-        "pkexec",
-        &["sh", "-c", script, "material-3", &target],
-        contents.as_bytes(),
-    )
-    .map(|_| ())
+    crate::fs::pkexec_write(path, contents.as_bytes(), true)
 }
 
 #[cfg(test)]

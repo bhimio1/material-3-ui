@@ -26,7 +26,7 @@ impl OsRelease {
             let Some((k, v)) = line.split_once('=') else {
                 continue;
             };
-            let v = v.trim().trim_matches('"').to_string();
+            let v = unquote(v.trim());
             match k.trim() {
                 "ID" => os.id = v,
                 "ID_LIKE" => os.id_like = v,
@@ -124,6 +124,30 @@ pub fn upgrade_command(helper: AurHelper) -> String {
     }
 }
 
+/// An os-release value without its quotes. Values may be double- or
+/// single-quoted (EndeavourOS writes `ID='endeavouros'`), and double-quoted
+/// ones may escape `"`, `\\`, `$` and `` ` `` with a backslash.
+fn unquote(v: &str) -> String {
+    if v.len() >= 2 && v.starts_with('\'') && v.ends_with('\'') {
+        return v[1..v.len() - 1].to_string();
+    }
+    if v.len() >= 2 && v.starts_with('"') && v.ends_with('"') {
+        let mut out = String::new();
+        let mut chars = v[1..v.len() - 1].chars();
+        while let Some(c) = chars.next() {
+            match (c, chars.clone().next()) {
+                ('\\', Some(n @ ('"' | '\\' | '$' | '`'))) => {
+                    out.push(n);
+                    chars.next();
+                }
+                _ => out.push(c),
+            }
+        }
+        return out;
+    }
+    v.to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -138,6 +162,13 @@ mod tests {
         assert!(!arch.is_cachyos());
         let endeavour = OsRelease::parse("ID=endeavouros\nID_LIKE=arch\n");
         assert!(endeavour.is_arch_based());
+        let quoted =
+            OsRelease::parse("ID='endeavouros'\nID_LIKE='arch'\nPRETTY_NAME='EndeavourOS'\n");
+        assert_eq!(quoted.id, "endeavouros");
+        assert_eq!(quoted.pretty_name, "EndeavourOS");
+        assert!(quoted.is_arch_based());
+        let escaped = OsRelease::parse("PRETTY_NAME=\"My \\\"Linux\\\"\"\n");
+        assert_eq!(escaped.pretty_name, "My \"Linux\"");
         let debian = OsRelease::parse("ID=debian\n");
         assert!(!debian.is_arch_based());
     }

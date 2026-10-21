@@ -75,6 +75,65 @@ impl Default for ThemeSettings {
     }
 }
 
+/// The palette `settings` resolve to, without an egui context (for CLIs
+/// and helpers like slurp). `system_dark` is the desktop's light/dark
+/// preference when known; `System` counts as dark otherwise, which is what
+/// end4-pC runs.
+pub fn resolve_palette(settings: &ThemeSettings, system_dark: Option<bool>) -> M3Palette {
+    let dark = wants_dark(settings.scheme, system_dark);
+    if settings.source == ThemeSource::Auto {
+        if let Some(p) = auto_theme_path().and_then(|p| M3Palette::from_theme_json(&p).ok()) {
+            return p;
+        }
+    }
+    M3Palette::from_seed(&settings.seed_color, dark)
+}
+
+fn wants_dark(scheme: ColorScheme, system_dark: Option<bool>) -> bool {
+    match scheme {
+        ColorScheme::Light => false,
+        ColorScheme::Dark => true,
+        ColorScheme::System => system_dark.unwrap_or(true),
+    }
+}
+
+/// [`resolve_palette`] with the desktop's preference unknown.
+pub fn headless_palette(settings: &ThemeSettings) -> M3Palette {
+    resolve_palette(settings, None)
+}
+
+/// slurp's colors (`-c -b -s -B`) in the desktop's palette: a primary
+/// border, the scrim outside the selection.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SlurpColors {
+    pub border: String,
+    pub background: String,
+    pub selection: String,
+    pub boxes: String,
+}
+
+impl SlurpColors {
+    pub fn new(p: &M3Palette) -> Self {
+        use palette::rgba_hex;
+        Self {
+            border: rgba_hex(p.primary, 0xff),
+            background: rgba_hex(p.scrim, 0x66),
+            selection: rgba_hex(p.primary, 0x22),
+            boxes: rgba_hex(p.primary_container, 0x40),
+        }
+    }
+
+    /// From the settings, without an egui context.
+    pub fn from_settings(settings: &ThemeSettings) -> Self {
+        Self::new(&headless_palette(settings))
+    }
+
+    /// The command-line arguments: `-c <border> -b <bg> -s <sel> -B <boxes>`.
+    pub fn args(&self) -> [&str; 8] {
+        ["-c", &self.border, "-b", &self.background, "-s", &self.selection, "-B", &self.boxes]
+    }
+}
+
 /// Applies [`ThemeSettings`] to an egui context and keeps it current: the
 /// desktop's palette file is watched, and the system light/dark preference
 /// is followed. Call [`ThemeManager::poll`] once per frame.
@@ -144,17 +203,9 @@ impl ThemeManager {
         self.error.take()
     }
 
-    fn wants_dark(&self, settings: &ThemeSettings) -> bool {
-        match settings.scheme {
-            ColorScheme::Light => false,
-            ColorScheme::Dark => true,
-            ColorScheme::System => self.system_dark.unwrap_or(true),
-        }
-    }
-
     /// Re-apply after the settings changed.
     pub fn apply(&mut self, settings: &ThemeSettings) {
-        let dark = self.wants_dark(settings);
+        let dark = wants_dark(settings.scheme, self.system_dark);
         let palette = match self.theme_file(settings) {
             Some(path) => match M3Palette::from_theme_json(&path) {
                 Ok(p) => p,
@@ -211,5 +262,21 @@ mod tests {
         assert!(s.filled_icons);
         let back: ThemeSettings = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
         assert_eq!(back, s);
+    }
+
+    #[test]
+    fn palette_without_a_context() {
+        let s = ThemeSettings { source: ThemeSource::Seed, scheme: ColorScheme::Light, ..Default::default() };
+        assert!(!headless_palette(&s).is_dark());
+        let system = ThemeSettings { source: ThemeSource::Seed, ..Default::default() };
+        assert!(headless_palette(&system).is_dark(), "System counts as dark");
+        assert!(!resolve_palette(&system, Some(false)).is_dark());
+        let c = SlurpColors::from_settings(&s);
+        assert!(c.border.starts_with('#') && c.border.len() == 9 && c.border.ends_with("ff"));
+        assert!(c.background.ends_with("66"));
+        let args = c.args();
+        assert_eq!(args[0], "-c");
+        assert_eq!(args[1], c.border);
+        assert_eq!(args[6], "-B");
     }
 }
