@@ -95,6 +95,28 @@ pub fn to_hex(c: Color32) -> String {
     format!("#{:02X}{:02X}{:02X}", c.r(), c.g(), c.b())
 }
 
+/// A color from a hex string, or the default seed color when it doesn't
+/// parse (for user- or server-supplied colors).
+pub fn hex(c: &str) -> Color32 {
+    parse_hex(c).unwrap_or(Color32::from_rgb(0x42, 0x85, 0xF4))
+}
+
+/// `#rrggbbaa` in lower case, the form slurp and most CLIs take.
+pub fn rgba_hex(c: Color32, alpha: u8) -> String {
+    format!("#{:02x}{:02x}{:02x}{:02x}", c.r(), c.g(), c.b(), alpha)
+}
+
+/// Near-black or white, whichever reads better on `bg` (labels on
+/// user-colored chips and events).
+pub fn text_on(bg: Color32) -> Color32 {
+    let l = 0.2126 * bg.r() as f32 + 0.7152 * bg.g() as f32 + 0.0722 * bg.b() as f32;
+    if l > 150.0 {
+        Color32::from_rgb(0x1b, 0x1b, 0x1f)
+    } else {
+        Color32::WHITE
+    }
+}
+
 fn relative_luminance(c: Color32) -> f32 {
     let f = |v: u8| {
         let v = v as f32 / 255.0;
@@ -173,6 +195,16 @@ mod tests {
         assert_eq!(parse_hex("00ff00"), Some(Color32::from_rgb(0, 255, 0)));
         assert_eq!(parse_hex("#12"), None);
         assert_eq!(to_hex(Color32::from_rgb(1, 2, 255)), "#0102FF");
+        assert_eq!(hex("#ff0000"), Color32::from_rgb(255, 0, 0));
+        assert_eq!(hex("bogus"), Color32::from_rgb(0x42, 0x85, 0xF4));
+        assert_eq!(rgba_hex(Color32::from_rgb(255, 0, 16), 0x66), "#ff001066");
+    }
+
+    #[test]
+    fn readable_text() {
+        assert_eq!(text_on(Color32::WHITE), Color32::from_rgb(0x1b, 0x1b, 0x1f));
+        assert_eq!(text_on(Color32::from_rgb(0xFF, 0xEB, 0x3B)), Color32::from_rgb(0x1b, 0x1b, 0x1f));
+        assert_eq!(text_on(Color32::from_rgb(0x1E, 0x3A, 0x8A)), Color32::WHITE);
     }
 
     #[test]

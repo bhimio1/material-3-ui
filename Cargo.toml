@@ -19,6 +19,16 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 dirs = "6"
 anyhow = "1"
+# Optional, behind the features below.
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"], optional = true }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"], optional = true }
+
+[features]
+default = []
+# Timestamped backups for `fs::save`.
+backups = ["dep:chrono"]
+# Decoding image thumbnails for `thumbs::Thumbnails`.
+image = ["dep:image"]
 
 [dev-dependencies]
 tempfile = "3"

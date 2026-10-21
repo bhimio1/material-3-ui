@@ -550,3 +550,210 @@ pub fn title_text(text: impl Into<String>, size: f32) -> egui::RichText {
 pub fn title_font(size: f32) -> FontId {
     FontId::new(size, crate::theme::style::medium_family())
 }
+
+/// A round color swatch with a ring when selected.
+pub fn color_swatch(ui: &mut Ui, color: Color32, selected: bool, tooltip: &str) -> Response {
+    let p = palette(ui);
+    let (rect, response) = ui.allocate_exact_size(vec2(28.0, 28.0), Sense::click());
+    if ui.is_rect_visible(rect) {
+        let c = rect.center();
+        if selected {
+            ui.painter().circle_stroke(c, 13.0, Stroke::new(2.0, p.primary));
+        } else if response.hovered() {
+            ui.painter().circle_stroke(c, 13.0, Stroke::new(1.5, p.outline));
+        }
+        ui.painter().circle_filled(c, 9.5, color);
+        ui.painter().circle_stroke(c, 9.5, Stroke::new(1.0, p.outline_variant));
+    }
+    let response = response.on_hover_cursor(egui::CursorIcon::PointingHand);
+    if tooltip.is_empty() {
+        response
+    } else {
+        response.on_hover_text(tooltip)
+    }
+}
+
+/// A big tile with an icon and two lines of text, for a page's main
+/// actions. `accent` makes it primary-tinted.
+pub fn action_tile(ui: &mut Ui, icon: MaterialIcon, title: &str, subtitle: &str, width: f32, accent: bool) -> Response {
+    let p = palette(ui);
+    let (rect, response) = ui.allocate_exact_size(vec2(width, 112.0), Sense::click());
+    if ui.is_rect_visible(rect) {
+        let (base, fg, icon_fg, sub_fg) = if accent {
+            (p.primary_container, p.on_primary_container, p.on_primary_container, p.on_primary_container.gamma_multiply(0.8))
+        } else {
+            (p.surface_container_high, p.on_surface, p.primary, p.on_surface_variant)
+        };
+        ui.painter().rect_filled(rect, CornerRadius::same(20), state_layer(base, fg, &response));
+        paint_icon(ui, icon, rect.left_top() + vec2(30.0, 34.0), 28.0, icon_fg);
+        let text_w = width - 32.0;
+        let title_g = truncated_galley(ui, title, title_font(16.0), fg, text_w);
+        ui.painter().galley(rect.left_bottom() + vec2(16.0, -38.0 - title_g.size().y / 2.0), title_g, fg);
+        let sub_g = truncated_galley(ui, subtitle, FontId::proportional(12.5), sub_fg, text_w);
+        ui.painter().galley(rect.left_bottom() + vec2(16.0, -18.0 - sub_g.size().y / 2.0), sub_g, sub_fg);
+    }
+    response.on_hover_cursor(egui::CursorIcon::PointingHand)
+}
+
+/// A thumbnail card: the picture (or `fallback` while it loads), a title
+/// and a subtitle, and an optional badge in the picture's corner.
+pub fn thumb_tile(
+    ui: &mut Ui,
+    texture: Option<&egui::TextureHandle>,
+    fallback: MaterialIcon,
+    title: &str,
+    subtitle: &str,
+    width: f32,
+    badge: Option<MaterialIcon>,
+) -> Response {
+    let p = palette(ui);
+    let pic_h = (width * 0.62).round();
+    let (rect, response) = ui.allocate_exact_size(vec2(width, pic_h + 52.0), Sense::click());
+    if !ui.is_rect_visible(rect) {
+        return response;
+    }
+    ui.painter().rect_filled(rect, CornerRadius::same(16), state_layer(p.surface_container, p.on_surface, &response));
+    let pic = Rect::from_min_size(rect.min + vec2(6.0, 6.0), vec2(width - 12.0, pic_h - 6.0));
+    ui.painter().rect_filled(pic, CornerRadius::same(12), p.surface_container_highest);
+    match texture {
+        Some(tex) => {
+            // Fit inside, keeping the aspect ratio.
+            let ts = tex.size_vec2();
+            let s = (pic.width() / ts.x).min(pic.height() / ts.y);
+            let r = Rect::from_center_size(pic.center(), ts * s);
+            egui::Image::new(tex).corner_radius(CornerRadius::same(8)).paint_at(ui, r);
+        }
+        None => paint_icon(ui, fallback, pic.center(), 32.0, p.on_surface_variant),
+    }
+    if let Some(b) = badge {
+        let c = pic.right_top() + vec2(-18.0, 18.0);
+        ui.painter().circle_filled(c, 13.0, p.secondary_container);
+        paint_icon(ui, b, c, 16.0, p.on_secondary_container);
+    }
+    let text_w = width - 24.0;
+    let title_g = truncated_galley(ui, title, FontId::proportional(13.5), p.on_surface, text_w);
+    ui.painter().galley(rect.left_bottom() + vec2(12.0, -42.0), title_g, p.on_surface);
+    let sub_g = truncated_galley(ui, subtitle, FontId::proportional(12.0), p.on_surface_variant, text_w);
+    ui.painter().galley(rect.left_bottom() + vec2(12.0, -22.0), sub_g, p.on_surface_variant);
+    if response.hovered() {
+        ui.painter().rect_stroke(rect, CornerRadius::same(16), Stroke::new(1.0, p.outline_variant), StrokeKind::Inside);
+    }
+    response.on_hover_cursor(egui::CursorIcon::PointingHand)
+}
+
+/// A rounded single-line text field. Returns the TextEdit's response.
+pub fn field(ui: &mut Ui, text: &mut String, hint: &str, width: f32, id: Id) -> Response {
+    let p = palette(ui);
+    egui::Frame::new()
+        .fill(p.surface_container_highest)
+        .corner_radius(CornerRadius::same(12))
+        .inner_margin(egui::Margin::symmetric(10, 6))
+        .show(ui, |ui| {
+            ui.add(
+                egui::TextEdit::singleline(text)
+                    .id(id)
+                    .frame(egui::Frame::NONE)
+                    .hint_text(hint)
+                    .font(FontId::proportional(14.0))
+                    .desired_width(width - 20.0),
+            )
+        })
+        .inner
+}
+
+/// A compact text button for status bars: label, hover layer, tooltip.
+pub fn chip(ui: &mut Ui, text: &str, tooltip: &str) -> Response {
+    let p = palette(ui);
+    let galley = ui.painter().layout_no_wrap(text.to_string(), FontId::proportional(12.5), p.on_surface_variant);
+    let (rect, response) = ui.allocate_exact_size(vec2(galley.size().x + 16.0, 24.0), Sense::click());
+    if response.hovered() {
+        ui.painter().rect_filled(rect, CornerRadius::same(12), p.on_surface.gamma_multiply(0.08));
+    }
+    ui.painter().galley(rect.center() - galley.size() / 2.0, galley, p.on_surface_variant);
+    let response = response.on_hover_cursor(egui::CursorIcon::PointingHand);
+    if tooltip.is_empty() {
+        response
+    } else {
+        response.on_hover_text(tooltip)
+    }
+}
+
+/// A menu entry with an optional leading icon, a check mark when
+/// `checked`, and a shortcut hint on the right. Closes the menu when
+/// clicked; returns whether it was.
+pub fn menu_item(ui: &mut Ui, icon: Option<MaterialIcon>, text: &str, shortcut: &str, checked: bool) -> bool {
+    let p = palette(ui);
+    // Context menus offer the whole window's width; keep them compact.
+    let width = ui.available_width().clamp(220.0, 300.0);
+    let (rect, response) = ui.allocate_exact_size(vec2(width, 32.0), Sense::click());
+    if response.hovered() {
+        ui.painter().rect_filled(rect, CornerRadius::same(8), p.on_surface.gamma_multiply(0.08));
+    }
+    let lead = if checked { Some(ICON_CHECK) } else { icon };
+    if let Some(i) = lead {
+        let color = if checked { p.primary } else { p.on_surface_variant };
+        paint_icon(ui, i, pos2(rect.left() + 19.0, rect.center().y), 18.0, color);
+    }
+    let hint_w = if shortcut.is_empty() {
+        0.0
+    } else {
+        let g = ui.painter().layout_no_wrap(shortcut.to_string(), FontId::proportional(12.0), p.on_surface_variant);
+        let w = g.size().x;
+        ui.painter().galley(pos2(rect.right() - 10.0 - w, rect.center().y - g.size().y / 2.0), g, p.on_surface_variant);
+        w + 16.0
+    };
+    let label = truncated_galley(ui, text, FontId::proportional(14.0), p.on_surface, rect.width() - 48.0 - hint_w);
+    ui.painter().galley(pos2(rect.left() + 38.0, rect.center().y - label.size().y / 2.0), label, p.on_surface);
+    let clicked = response.on_hover_cursor(egui::CursorIcon::PointingHand).clicked();
+    if clicked {
+        ui.close();
+    }
+    clicked
+}
+
+/// An icon for a file, by name (or a folder, open when `expanded`).
+pub fn file_icon(name: &str, is_dir: bool, expanded: bool) -> MaterialIcon {
+    if is_dir {
+        return if expanded { ICON_FOLDER_OPEN } else { ICON_FOLDER };
+    }
+    let lower = name.to_lowercase();
+    let ext = lower.rsplit_once('.').map(|(_, e)| e).unwrap_or("");
+    match ext {
+        "rs" | "c" | "h" | "cc" | "cpp" | "hpp" | "go" | "py" | "java" | "kt" | "rb" | "zig" | "lua" | "qml" | "nim"
+        | "swift" => ICON_CODE,
+        "js" | "mjs" | "cjs" | "ts" | "tsx" | "jsx" => ICON_JAVASCRIPT,
+        "json" | "jsonc" | "json5" => ICON_DATA_OBJECT,
+        "html" | "htm" | "xml" | "svg" => ICON_HTML,
+        "css" | "scss" | "sass" | "less" => ICON_CSS,
+        "md" | "markdown" | "mdown" => ICON_MARKDOWN,
+        "sh" | "bash" | "zsh" | "fish" => ICON_TERMINAL,
+        "toml" | "yaml" | "yml" | "ini" | "conf" | "cfg" | "desktop" | "service" | "env" => ICON_SETTINGS,
+        "png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "ico" | "avif" => ICON_IMAGE,
+        "pdf" => ICON_PICTURE_AS_PDF,
+        "mp3" | "flac" | "ogg" | "oga" | "wav" | "opus" | "m4a" => ICON_AUDIO_FILE,
+        "mp4" | "mkv" | "webm" | "mov" | "avi" => ICON_VIDEO_FILE,
+        "zip" | "tar" | "gz" | "xz" | "zst" | "7z" | "rar" | "bz2" => ICON_FOLDER_ZIP,
+        "lock" => ICON_LOCK,
+        "sql" | "db" | "sqlite" => ICON_DATABASE,
+        "txt" | "log" => ICON_ARTICLE,
+        _ if matches!(lower.as_str(), "pkgbuild" | "makefile" | "dockerfile" | "justfile") => ICON_DEPLOYED_CODE,
+        _ => ICON_DESCRIPTION,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn icons_by_extension() {
+        let same = |a: MaterialIcon, b: MaterialIcon| a.codepoint == b.codepoint;
+        assert!(same(file_icon("main.rs", false, false), ICON_CODE));
+        assert!(same(file_icon("README.MD", false, false), ICON_MARKDOWN));
+        assert!(same(file_icon("PKGBUILD", false, false), ICON_DEPLOYED_CODE));
+        assert!(same(file_icon("src", true, true), ICON_FOLDER_OPEN));
+        assert!(same(file_icon("src", true, false), ICON_FOLDER));
+        assert!(same(file_icon("noext", false, false), ICON_DESCRIPTION));
+        assert!(same(file_icon("archive.tar.gz", false, false), ICON_FOLDER_ZIP));
+    }
+}

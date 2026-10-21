@@ -12,13 +12,34 @@ pub const PAGE_WIDTH: f32 = 880.0;
 
 /// A scrolling page with a large header.
 pub fn page(ui: &mut Ui, icon: MaterialIcon, title: &str, subtitle: &str, body: impl FnOnce(&mut Ui)) {
+    scrolling_page(ui, ("page", title), Margin::symmetric(32, 24), PAGE_WIDTH, icon, title, subtitle, 0.0, body);
+}
+
+/// A scrolling page like [`page`], but up to `max_width` wide, for
+/// dashboards of [`tile`]s.
+pub fn wide_page(ui: &mut Ui, icon: MaterialIcon, title: &str, subtitle: &str, max_width: f32, body: impl FnOnce(&mut Ui)) {
+    scrolling_page(ui, ("wide-page", title), Margin::symmetric(28, 22), max_width, icon, title, subtitle, 12.0, body);
+}
+
+#[allow(clippy::too_many_arguments)]
+fn scrolling_page(
+    ui: &mut Ui,
+    id: (&str, &str),
+    margin: Margin,
+    max_width: f32,
+    icon: MaterialIcon,
+    title: &str,
+    subtitle: &str,
+    gap: f32,
+    body: impl FnOnce(&mut Ui),
+) {
     let p = widgets::palette(ui);
     egui::ScrollArea::vertical()
-        .id_salt(("page", title))
+        .id_salt(id)
         .auto_shrink([false, false])
         .show(ui, |ui| {
-            Frame::new().inner_margin(Margin::symmetric(32, 24)).show(ui, |ui| {
-                ui.set_max_width(ui.available_width().min(PAGE_WIDTH));
+            Frame::new().inner_margin(margin).show(ui, |ui| {
+                ui.set_max_width(ui.available_width().min(max_width));
                 ui.horizontal(|ui| {
                     widgets::icon(ui, icon, 30.0, p.primary);
                     ui.label(RichText::new(title).size(28.0).color(p.on_surface));
@@ -26,6 +47,7 @@ pub fn page(ui: &mut Ui, icon: MaterialIcon, title: &str, subtitle: &str, body: 
                 if !subtitle.is_empty() {
                     ui.add(egui::Label::new(RichText::new(subtitle).color(p.on_surface_variant)).wrap());
                 }
+                ui.add_space(gap);
                 body(ui);
                 ui.add_space(24.0);
             });
@@ -357,4 +379,83 @@ pub fn empty_hint(ui: &mut Ui, text: &str) {
         egui::FontId::proportional(13.0),
         p.on_surface_variant,
     );
+}
+
+/// A dashboard tile: a rounded surface with an icon and title, a value on
+/// the right of the header, and `body` below.
+pub fn tile(ui: &mut Ui, icon: MaterialIcon, title: &str, value: &str, body: impl FnOnce(&mut Ui)) {
+    let p = widgets::palette(ui);
+    Frame::new()
+        .fill(p.surface_container)
+        .corner_radius(CornerRadius::same(20))
+        .inner_margin(Margin::same(16))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.horizontal(|ui| {
+                widgets::icon(ui, icon, 20.0, p.primary);
+                ui.label(widgets::title_text(title, 15.0).color(p.on_surface));
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.label(widgets::title_text(value, 18.0).color(p.on_surface));
+                });
+            });
+            ui.add_space(8.0);
+            body(ui);
+        });
+    ui.add_space(12.0);
+}
+
+/// A tile's contents, for [`tile_grid`].
+pub type TileFn<'a> = Box<dyn FnOnce(&mut Ui) + 'a>;
+
+/// How many columns of at least `min_width` fit in `width` (1 to `max`),
+/// with 12 px gaps.
+pub fn grid_columns(width: f32, min_width: f32, max: usize) -> usize {
+    (((width + 12.0) / (min_width + 12.0)).floor() as usize).clamp(1, max.max(1))
+}
+
+/// Lay boxed tiles out in as many columns as fit `min_width` (up to
+/// three), filling across then down.
+pub fn tile_grid<'a>(ui: &mut Ui, min_width: f32, tiles: Vec<TileFn<'a>>) {
+    let cols = grid_columns(ui.available_width(), min_width, 3);
+    if cols == 1 {
+        for t in tiles {
+            t(ui);
+        }
+        return;
+    }
+    let mut buckets: Vec<Vec<TileFn<'a>>> = (0..cols).map(|_| Vec::new()).collect();
+    for (i, t) in tiles.into_iter().enumerate() {
+        buckets[i % cols].push(t);
+    }
+    ui.columns(cols, |columns| {
+        for (col, bucket) in columns.iter_mut().zip(buckets) {
+            for t in bucket {
+                t(col);
+            }
+        }
+    });
+}
+
+/// A small label / value line inside a tile.
+pub fn stat_line(ui: &mut Ui, label: &str, value: &str) {
+    let p = widgets::palette(ui);
+    ui.horizontal(|ui| {
+        ui.label(RichText::new(label).size(12.5).color(p.on_surface_variant));
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.label(RichText::new(value).size(12.5).color(p.on_surface));
+        });
+    });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn grid_columns_fit_the_width() {
+        assert_eq!(grid_columns(300.0, 320.0, 3), 1);
+        assert_eq!(grid_columns(652.0, 320.0, 3), 2);
+        assert_eq!(grid_columns(2000.0, 320.0, 3), 3);
+        assert_eq!(grid_columns(0.0, 0.0, 0), 1);
+    }
 }
