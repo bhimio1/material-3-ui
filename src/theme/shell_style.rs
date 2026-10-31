@@ -14,7 +14,9 @@
 //!   "colors": { "primary": "#d0bcff", "on_primary": "#381e72", "…": "…" },
 //!   "fonts": { "main": "Google Sans Flex", "title": "…", "monospace": "…" },
 //!   "radius": { "small": 12, "normal": 17, "large": 23 },
-//!   "transparency": { "background": 0.0, "content": 0.0 }
+//!   "transparency": { "background": 0.0, "content": 0.0 },
+//!   "wallpaper": "/home/me/Pictures/Wallpapers/x.jpg",
+//!   "wallpaper_thumbnail": ""
 //! }
 //! ```
 //!
@@ -71,6 +73,11 @@ pub struct ShellStyle {
     pub fonts: Fonts,
     pub radius: Radius,
     pub transparency: Transparency,
+    /// The current wallpaper's path (empty when unknown or a solid color);
+    /// Settings' login screen and boot animation use it.
+    pub wallpaper: String,
+    /// A still frame, for video wallpapers.
+    pub wallpaper_thumbnail: String,
 }
 
 /// `$XDG_STATE_HOME/m3/style.json`.
