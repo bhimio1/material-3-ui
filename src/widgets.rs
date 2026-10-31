@@ -11,6 +11,23 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 static FILLED_ICONS: AtomicBool = AtomicBool::new(true);
+/// The shell's corner rounding relative to Material 3's, as f32 bits.
+static RADIUS_SCALE: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0x3f80_0000); // 1.0
+
+pub fn set_radius_scale(scale: f32) {
+    RADIUS_SCALE.store(scale.to_bits(), Ordering::Relaxed);
+}
+
+/// How round the desktop shell is compared to Material 3's defaults (1.0).
+/// Multiply fixed corner radii by it to match the shell.
+pub fn radius_scale() -> f32 {
+    f32::from_bits(RADIUS_SCALE.load(Ordering::Relaxed))
+}
+
+/// `CornerRadius::same(r)` scaled to the shell's rounding.
+pub fn radius(r: f32) -> egui::CornerRadius {
+    egui::CornerRadius::same((r * radius_scale()).round().clamp(0.0, 255.0) as u8)
+}
 
 pub fn set_filled_icons(filled: bool) {
     FILLED_ICONS.store(filled, Ordering::Relaxed);
