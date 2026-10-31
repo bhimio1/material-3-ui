@@ -1,9 +1,13 @@
-//! Material 3 theming: the palette (from end4-pC's colors, a matugen
-//! `theme.json`, or a seed color), the egui style built from it, and
-//! [`ThemeManager`], which keeps an app's look in sync with the desktop.
+//! Material 3 theming: the palette (from the shell's exported style, its
+//! colors, a matugen `theme.json`, or a seed color), the egui style built
+//! from it, and [`ThemeManager`], which keeps an app's look in sync with the
+//! desktop.
 
 pub mod palette;
+pub mod shell_style;
 pub mod style;
+
+pub use shell_style::ShellStyle;
 
 pub use palette::M3Palette;
 
@@ -22,11 +26,26 @@ pub fn file_manager_theme_path() -> Option<PathBuf> {
     dirs::config_dir().map(|d| d.join("material_3_file_manager/theme.json"))
 }
 
+/// Theme files to watch, in priority order: the shell's exported style
+/// (Material 3 Settings' shell integration), end4's colors, the file
+/// manager's matugen output.
+pub fn theme_paths() -> Vec<PathBuf> {
+    [shell_style::style_path(), end4_colors_path(), file_manager_theme_path()].into_iter().flatten().collect()
+}
+
+/// The palette and corner-radius scale a theme file gives.
+pub fn load_theme_file(path: &Path) -> anyhow::Result<(M3Palette, f32)> {
+    if Some(path) == shell_style::style_path().as_deref() {
+        let style = ShellStyle::load(path)?;
+        return Ok((style.palette(), style.radius_scale()));
+    }
+    Ok((M3Palette::from_theme_json(path)?, 1.0))
+}
+
 /// First palette file that exists, in priority order.
 pub fn auto_theme_path() -> Option<PathBuf> {
-    [end4_colors_path(), file_manager_theme_path()]
+    theme_paths()
         .into_iter()
-        .flatten()
         .find(|p| p.is_file())
 }
 
@@ -82,7 +101,7 @@ impl Default for ThemeSettings {
 pub fn resolve_palette(settings: &ThemeSettings, system_dark: Option<bool>) -> M3Palette {
     let dark = wants_dark(settings.scheme, system_dark);
     if settings.source == ThemeSource::Auto {
-        if let Some(p) = auto_theme_path().and_then(|p| M3Palette::from_theme_json(&p).ok()) {
+        if let Some((p, _)) = auto_theme_path().and_then(|p| load_theme_file(&p).ok()) {
             return p;
         }
     }
@@ -166,7 +185,11 @@ impl ThemeManager {
             })
             .ok()
             .map(|mut w| {
-                for file in [end4_colors_path(), file_manager_theme_path()].into_iter().flatten() {
+                // The style folder may not exist until a shell first writes it.
+                if let Some(dir) = shell_style::style_path().as_deref().and_then(Path::parent) {
+                    let _ = std::fs::create_dir_all(dir);
+                }
+                for file in theme_paths() {
                     if let Some(dir) = file.parent().filter(|d| d.is_dir()) {
                         let _ = w.watch(dir, notify::RecursiveMode::NonRecursive);
                     }
@@ -206,17 +229,18 @@ impl ThemeManager {
     /// Re-apply after the settings changed.
     pub fn apply(&mut self, settings: &ThemeSettings) {
         let dark = wants_dark(settings.scheme, self.system_dark);
-        let palette = match self.theme_file(settings) {
-            Some(path) => match M3Palette::from_theme_json(&path) {
+        let (palette, radius_scale) = match self.theme_file(settings) {
+            Some(path) => match load_theme_file(&path) {
                 Ok(p) => p,
                 Err(e) => {
                     self.error = Some(format!("Couldn't read {}: {e}", path.display()));
-                    M3Palette::from_seed(&settings.seed_color, dark)
+                    (M3Palette::from_seed(&settings.seed_color, dark), 1.0)
                 }
             },
-            None => M3Palette::from_seed(&settings.seed_color, dark),
+            None => (M3Palette::from_seed(&settings.seed_color, dark), 1.0),
         };
-        style::apply(&self.ctx, &palette);
+        style::apply_scaled(&self.ctx, &palette, radius_scale);
+        crate::widgets::set_radius_scale(radius_scale);
         crate::widgets::set_palette(&self.ctx, palette.clone());
         crate::widgets::set_filled_icons(settings.filled_icons);
         let scale = settings.ui_scale.clamp(0.6, 2.5);

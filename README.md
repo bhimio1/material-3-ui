@@ -11,7 +11,8 @@ The shared look of the Material 3 apps (Settings, Files, Music, Games, Browser, 
 ## What's in it
 
 - **`theme`**:
-  - Material You palettes from end4-pC's generated `colors.json` (followed live), a matugen `theme.json`, or a seed color.
+  - Material You palettes, followed live, from the shell's exported style (`$XDG_STATE_HOME/m3/style.json`, written by Material 3 Settings' shell integration for ii, end4-pC, iNiR and Dux Shell), end4-pC's generated `colors.json`, a matugen `theme.json`, or a seed color.
+  - The style file also carries the shell's fonts and corner rounding. `widgets::radius_scale()` / `widgets::radius(r)` scale fixed radii to the shell's, and egui's own widget and window radii follow it already.
   - The egui style built from a palette, with Inter fonts and Material Symbols.
   - `ThemeManager` applies an app's `ThemeSettings` and keeps it current: the palette file is watched and the system light/dark preference is followed.
   - `headless_palette` for CLIs without a window, and `SlurpColors` (slurp's `-c -b -s -B` in the desktop's colors). `palette::hex`, `rgba_hex` and `text_on` (black or white on a user color).

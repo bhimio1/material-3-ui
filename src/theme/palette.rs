@@ -153,11 +153,15 @@ impl M3Palette {
                 .into_iter()
                 .filter_map(|(k, v)| v.as_str().map(|s| (k, s.to_string())))
                 .collect();
+        Ok(Self::from_color_map(&map, None))
+    }
 
+    /// A palette from role name → hex color. Missing roles come from a
+    /// scheme generated off the map's primary color; `dark` picks that
+    /// scheme's mode, and is guessed from the background when unknown.
+    pub fn from_color_map(map: &HashMap<String, String>, dark: Option<bool>) -> Self {
         let background = map.get("background").and_then(|h| parse_hex(h));
-        let dark = background
-            .map(|c| relative_luminance(c) < 0.2)
-            .unwrap_or(true);
+        let dark = dark.unwrap_or_else(|| background.map(|c| relative_luminance(c) < 0.2).unwrap_or(true));
         let seed = map
             .get("primary")
             .filter(|h| parse_hex(h).is_some())
@@ -165,8 +169,8 @@ impl M3Palette {
             .unwrap_or_else(|| DEFAULT_SEED.to_string());
 
         let mut palette = Self::from_seed(&seed, dark);
-        palette.apply_overrides(&map);
-        Ok(palette)
+        palette.apply_overrides(map);
+        palette
     }
 
     pub fn is_dark(&self) -> bool {

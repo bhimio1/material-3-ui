@@ -49,6 +49,13 @@ pub fn install_fonts(ctx: &egui::Context) {
 }
 
 pub fn apply(ctx: &egui::Context, p: &M3Palette) {
+    apply_scaled(ctx, p, 1.0)
+}
+
+/// [`apply`] with corner radii scaled to the shell's (see
+/// [`super::shell_style::ShellStyle::radius_scale`]).
+pub fn apply_scaled(ctx: &egui::Context, p: &M3Palette, radius_scale: f32) {
+    let r = |v: f32| CornerRadius::same((v * radius_scale).round().clamp(0.0, 255.0) as u8);
     let dark = p.is_dark();
     let mut visuals = if dark {
         Visuals::dark()
@@ -62,8 +69,8 @@ pub fn apply(ctx: &egui::Context, p: &M3Palette) {
     visuals.panel_fill = p.surface;
     visuals.window_fill = p.surface_container_high;
     visuals.window_stroke = Stroke::NONE;
-    visuals.window_corner_radius = CornerRadius::same(28);
-    visuals.menu_corner_radius = CornerRadius::same(12);
+    visuals.window_corner_radius = r(28.0);
+    visuals.menu_corner_radius = r(12.0);
     visuals.faint_bg_color = p.surface_container_low;
     visuals.extreme_bg_color = p.surface_container_highest;
     visuals.text_edit_bg_color = Some(p.surface_container_highest);
@@ -89,7 +96,7 @@ pub fn apply(ctx: &egui::Context, p: &M3Palette) {
     visuals.slider_trailing_fill = true;
     visuals.striped = false;
 
-    let radius = CornerRadius::same(10);
+    let radius = r(10.0);
     let w = &mut visuals.widgets;
     w.noninteractive.bg_fill = p.surface_container;
     w.noninteractive.weak_bg_fill = p.surface_container;
